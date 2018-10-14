@@ -1,0 +1,13 @@
+version: 0.2
+
+phases:
+  prebuild:
+    commands:
+            - git clone https://github.com/tjnguyen/demo2.git 
+       
+               
+  build:
+    commands:
+      - mvn install
+artifacts:
+    files: './target/demo2.war'

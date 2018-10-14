@@ -1,23 +1,31 @@
 package resources;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import domain.ErrorInfo;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.context.request.async.DeferredResult;
+
 import domain.Product;
 import domain.ProductResponse;
 import exception.DataAccessException;
@@ -32,6 +40,8 @@ public class ProductController
    
    @Autowired
    private ProductValidator prodValidator;
+   
+   private ExecutorService  executor = Executors.newFixedThreadPool(10);
    
    
    
@@ -93,27 +103,74 @@ public class ProductController
    }
    
    @RequestMapping(method=RequestMethod.GET, value="/throwException")
-   public void throwException ()
+   public ResponseEntity<String> throwException ()
    {
 	   throw new DataAccessException("Error accessing from database");
    }
    
    @ExceptionHandler(DataAccessException.class)
-   @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-   @ResponseBody ErrorInfo
+   @ResponseStatus(HttpStatus.BAD_GATEWAY)
+   @ResponseBody ResponseEntity<String>
    handleProductException (DataAccessException ex, HttpServletRequest req)
    {
-	   System.out.println("calling handleProductException");
+	   System.out.println("demo3 calling handleProductException");
 	   req.setAttribute("javax.servlet.error.status_code",
 						HttpStatus.INTERNAL_SERVER_ERROR.value()); 
 	   req.setAttribute("exceptionMessage", ex.getMessage());
 	   
-	   ErrorInfo errorInfo = new ErrorInfo("/displayerror", ex);
+	   ResponseEntity<String> errorInfo = new ResponseEntity<String>("External error" , HttpStatus.BAD_GATEWAY);
 	   
 	   return errorInfo;
 	   
 
    }
+   
+   /*private void excecute()
+   {
+		RestTemplateBuilder restTemplateBuilder;
+        RestTemplate  restTemplate = restTemplateBuilder.build();
+		
+	    restTemplate.getForObject("/{name}/details", Details.class, name);
+   }*/
+   
+   
+   @RequestMapping(value = "/deferred", method = RequestMethod.GET, produces = "text/html")
+   
+       public DeferredResult<String> executeSlowTask() {
+   
+           System.out.println("Request received");
+   
+           DeferredResult<String> deferredResult = new DeferredResult<>();
+           
+           deferredResult.onCompletion(() -> System.out.println(" IT COMPLETE"));
+           new Thread(() -> {
+               System.out.println("async task started");
+               try {
+                   Thread.sleep(2000);
+                   deferredResult.setResult("test async result");
+               } catch (InterruptedException e) {
+                   e.printStackTrace();
+               }
+               System.out.println("async task finished");
+              
+           }).start();
+
+           return deferredResult;
+   }
+   
+   
+   @RequestMapping(value = "/testdefer", method = RequestMethod.GET, produces = "text/html")
+   public DeferredResult<String> execute()
+   {   
+	   DeferredResult<String> deferredResult = new DeferredResult<>();
+	   deferredResult.onCompletion(() -> System.out.println(" IT COMPLETE"));
+	   
+	   Future<String> f = executor.submit(new ItemService(deferredResult));
+	   
+	   return  deferredResult;
+	   
+   }
+
    
 	   
 }
